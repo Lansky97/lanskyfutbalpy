@@ -75,6 +75,47 @@ class Team:
         Team.calculate_team_strengths(teams,league_avg_home, league_avg_away, xG_factor)
         return teams
     
+    @classmethod
+    def update_teams(cls, teams, results, new_results, xG_factor=0.6):
+        league_avg_home, league_avg_away = Team.get_league_averages(results, xG_factor)
+        new_results = pd.DataFrame(new_results)
+
+        for _, row in new_results.iterrows():
+            home = row['Home']
+            away = row['Away']
+            home_goals = int(row['HomeGoals'])
+            away_goals = int(row['AwayGoals'])
+            home_xg = float(row['Home_xG'])
+            away_xg = float(row['Away_xG'])
+            home_pts = int(row['Home_pts'])
+            away_pts = int(row['Away_pts'])
+
+            if home not in teams or away not in teams:
+                raise ValueError(f"Teams {home} or {away} not found in the league.")
+
+            # Update games played
+            teams[home].home_games_played += 1
+            teams[away].away_games_played += 1
+
+            # Update goals
+            teams[home].home_goals += home_goals
+            teams[away].away_goals += away_goals
+            teams[home].home_goals_against += away_goals
+            teams[away].away_goals_against += home_goals
+
+            # Update xG
+            teams[home].home_xg += home_xg
+            teams[away].away_xg += away_xg
+            teams[home].home_xga += away_xg
+            teams[away].away_xga += home_xg
+
+            # Update Points scored
+            teams[home].home_points += home_pts
+            teams[away].away_points += away_pts
+
+        # Calculate team strengths
+        Team.calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor)
+
     @staticmethod
     def get_league_averages(results, xG_factor=0.6):
         home_goals = pd.to_numeric(results['HomeGoals'], errors='coerce')
