@@ -73,9 +73,9 @@ class MarketsMatch(Match):
 class SimmedMatch(Match):
     def __init__(self, teams, fixture, xg_factor=0.6):
         super().__init__(teams, fixture, xg_factor)
-        self.result = self.sample_result()
+        self.sim_result = self.get_sim_result()
 
-    def sample_result(self):
+    def get_sim_result(self):
         home_exp, away_exp = self.match_expectation
         
         rng = np.random.default_rng()

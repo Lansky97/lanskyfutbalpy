@@ -24,7 +24,12 @@ class League:
         matches = read_results(match_data)
         league_name = matches[0]['Competition_Name'] if matches else "Unknown League"
         return cls(league_name, matches, date_cutoff, xG_factor)
-        
+    
+    def update_league(self, new_results, update_date):
+        self.update_results(new_results)
+        self.update_fixtures(update_date)
+        Team.update_teams(self.teams, new_results, self.xG_factor)
+
     def generate_fixtures(self):
         fixtures = []
         for row in self.matches:

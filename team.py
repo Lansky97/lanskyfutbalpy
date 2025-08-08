@@ -74,26 +74,65 @@ class Team:
         # Calculate team strengths
         Team.calculate_team_strengths(teams,league_avg_home, league_avg_away, xG_factor)
         return teams
-    
+
     @staticmethod
-    def get_league_averages(results, xG_factor=0.6):
-        home_goals = pd.to_numeric(results['HomeGoals'], errors='coerce')
-        away_goals = pd.to_numeric(results['AwayGoals'], errors='coerce')
-        home_xg = pd.to_numeric(results['Home_xG'], errors='coerce')
-        away_xg = pd.to_numeric(results['Away_xG'], errors='coerce')
+    def update_teams(teams, new_results, xG_factor=0.6):
+        league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
+        new_results = pd.DataFrame(new_results)
 
-        total_home_goals = home_goals.sum()
-        total_away_goals = away_goals.sum()
-        total_home_xg = home_xg.sum()
-        total_away_xg = away_xg.sum()
+        for _, row in new_results.iterrows():
+            home = row['Home']
+            away = row['Away']
+            home_goals = int(row['HomeGoals'])
+            away_goals = int(row['AwayGoals'])
+            home_xg = float(row['Home_xG'])
+            away_xg = float(row['Away_xG'])
+            home_pts = int(row['Home_pts'])
+            away_pts = int(row['Away_pts'])
 
-        league_avg_home = ((1-xG_factor)*total_home_goals + xG_factor*total_home_xg) / len(results)
-        league_avg_away = ((1-xG_factor)*total_away_goals + xG_factor*total_away_xg)/ len(results)
+            if home not in teams or away not in teams:
+                raise ValueError(f"Teams {home} or {away} not found in the league.")
+
+            # Update games played
+            teams[home].home_games_played += 1
+            teams[away].away_games_played += 1
+
+            # Update goals
+            teams[home].home_goals += home_goals
+            teams[away].away_goals += away_goals
+            teams[home].home_goals_against += away_goals
+            teams[away].away_goals_against += home_goals
+
+            # Update xG
+            teams[home].home_xg += home_xg
+            teams[away].away_xg += away_xg
+            teams[home].home_xga += away_xg
+            teams[away].away_xga += home_xg
+
+            # Update Points scored
+            teams[home].home_points += home_pts
+            teams[away].away_points += away_pts
+
+        # Calculate team strengths
+        Team.calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor)
+
+    @staticmethod
+    def get_league_averages(teams, xG_factor=0.6):
+        home_goals = sum(team.home_goals for team in teams.values())
+        away_goals = sum(team.away_goals for team in teams.values())
+        home_xg = sum(team.home_xg for team in teams.values())
+        away_xg = sum(team.away_xg for team in teams.values())
+        games_count = sum(team.home_games_played for team in teams.values())
+
+        smooth_home_goals = (1-xG_factor)*home_goals + xG_factor*home_xg
+        smooth_away_goals = (1-xG_factor)*away_goals + xG_factor*away_xg
+        league_avg_home = smooth_home_goals / games_count if games_count else 0
+        league_avg_away = smooth_away_goals / games_count if games_count else 0
 
         return league_avg_home, league_avg_away
     
     @staticmethod
-    def calculate_team_strengths(teams,league_avg_home, league_avg_away, xG_factor=0.6): 
+    def calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor=0.6):
         for team in teams.values():
             smoothed_home_goals = (1-xG_factor)*team.home_goals + xG_factor*team.home_xg
             smoothed_home_goals_against = (1-xG_factor)*team.home_goals_against + xG_factor*team.home_xga
