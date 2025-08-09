@@ -34,7 +34,6 @@ class Team:
     @classmethod
     def teams_from_results(cls, results, xG_factor=0.6):
         teams = {}
-        league_avg_home, league_avg_away = Team.get_league_averages(results, xG_factor)
 
         for _,row in results.iterrows():
             home = row['Home']
@@ -72,12 +71,12 @@ class Team:
             teams[away].away_points += away_pts
 
         # Calculate team strengths
-        Team.calculate_team_strengths(teams,league_avg_home, league_avg_away, xG_factor)
+        league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
+        Team.calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor)
         return teams
 
     @staticmethod
     def update_teams(teams, new_results, xG_factor=0.6):
-        league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
         new_results = pd.DataFrame(new_results)
 
         for _, row in new_results.iterrows():
@@ -114,6 +113,7 @@ class Team:
             teams[away].away_points += away_pts
 
         # Calculate team strengths
+        league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
         Team.calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor)
 
     @staticmethod

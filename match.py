@@ -22,10 +22,13 @@ class Match:
         return home_expected_goals, away_expected_goals
 
     @classmethod
-    def from_fixtures(cls, teams, fixtures, xG_factor, max_goals):
+    def from_fixtures(cls, teams, fixtures, xG_factor, max_goals = None):
         matches = []
         for _, fixture in fixtures.iterrows():
-            match = cls(teams, fixture, xG_factor, max_goals) if 'max_goals' in cls.__init__.__code__.co_varnames else cls(teams, fixture, xG_factor)
+            if max_goals is not None and 'max_goals' in cls.__init__.__code__.co_varnames:
+                match = cls(teams, fixture, xG_factor, max_goals)
+            else:
+                match = cls(teams, fixture, xG_factor)
             matches.append(match)
         return matches
 

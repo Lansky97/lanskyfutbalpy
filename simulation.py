@@ -13,16 +13,14 @@ class Simulation:
         for _ in range(self.n_trials):
             sim_league = copy.deepcopy(self.league)
             unique_dates = sim_league.fixtures['Date'].unique()
-            for idx, match_date in unique_dates:
+            for idx, match_date in enumerate(unique_dates):
                 md_fixtures = sim_league.fixtures[sim_league.fixtures['Date'] == match_date]
                 md_results = []
-                for _, fixture in md_fixtures.iterrows():
-                    day_matches = SimmedMatch.from_fixtures(sim_league.teams, fixture, sim_league.xG_factor)
-                    md_results.append(day_matches.sim_result)
-            
-            next_date = unique_dates[idx + 1] if idx + 1 < len(unique_dates) else match_date
-            sim_league.update_league(md_results, next_date)
+                day_matches = SimmedMatch.from_fixtures(sim_league.teams, md_fixtures, sim_league.xG_factor)
+                md_results.extend([match.sim_result for match in day_matches])
 
-        sim_league.league_table = sim_league.generate_league_table()
-        simmed_leagues.append(sim_league)
+                sim_league.update_league(md_results)
+
+            sim_league.league_table = sim_league.generate_league_table()
+            simmed_leagues.append(sim_league)
         return simmed_leagues
