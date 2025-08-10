@@ -2,26 +2,37 @@ import copy
 from match import Match, SimmedMatch
 import pandas as pd
 import numpy as np
+from typing import List, Optional
+from league import League
+
+class Config:
+    def __init__(self, seed: Optional[int] = None):
+        self.seed = seed
 
 class Simulation:
-    def __init__(self,league, n_trials=1000):
+    def __init__(self, league: League, n_trials: int = 1000, config: Optional[Config] = None) -> None:
+        if not isinstance(league, League):
+            raise TypeError("league must be a League object.")
+        if not isinstance(n_trials, int) or n_trials <= 0:
+            raise ValueError("n_trials must be a positive integer.")
         self.league = league
         self.n_trials = n_trials
-        self.simmed_leagues = self.simulate_season()
-        self.mean_final_table = self.mean_final_table()
-        self.position_odds = self.position_odds()
-        self.competition_markets = self.competition_markets()
+        self.config = config or Config()
+        self.simmed_leagues: List[League] = self.simulate_season()
+        self.mean_final_table: pd.DataFrame = self.mean_final_table()
+        self.position_odds: pd.DataFrame = self.position_odds()
+        self.competition_markets: pd.DataFrame = self.competition_markets()
 
-    def simulate_season(self):
-        simmed_leagues = []
-
+    def simulate_season(self) -> List[League]:
+        simmed_leagues: List[League] = []
+        rng = np.random.default_rng(self.config.seed)
         for _ in range(self.n_trials):
             sim_league = copy.deepcopy(self.league)
             unique_dates = sim_league.fixtures['Date'].unique()
             for match_date in unique_dates:
                 md_fixtures = sim_league.fixtures[sim_league.fixtures['Date'] == match_date]
                 md_results = []
-                day_matches = SimmedMatch.from_fixtures(sim_league.teams, md_fixtures, sim_league.xG_factor)
+                day_matches = SimmedMatch.from_fixtures(sim_league.teams, md_fixtures, sim_league.xG_factor, rng=rng)
                 md_results.extend([match.sim_result for match in day_matches])
 
                 sim_league.update_league(md_results)
