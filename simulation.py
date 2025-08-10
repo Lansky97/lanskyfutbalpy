@@ -45,5 +45,8 @@ class Simulation:
 
         pos_counts = all_tables.groupby('Team')['Pos'].value_counts().unstack(fill_value=0)
         probs = pos_counts / self.n_trials
-
+        
+        probs['Avg_Pos'] = (probs * probs.columns).sum(axis=1)
+        probs = probs.sort_values('Avg_Pos')
+        probs = probs.drop(columns='Avg_Pos')
         return probs
