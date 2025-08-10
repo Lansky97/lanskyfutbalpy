@@ -10,6 +10,7 @@ class Simulation:
         self.simmed_leagues = self.simulate_season()
         self.mean_final_table = self.mean_final_table()
         self.position_odds = self.position_odds()
+        self.competition_markets = self.competition_markets()
 
     def simulate_season(self):
         simmed_leagues = []
@@ -45,8 +46,21 @@ class Simulation:
 
         pos_counts = all_tables.groupby('Team')['Pos'].value_counts().unstack(fill_value=0)
         probs = pos_counts / self.n_trials
-        
+
         probs['Avg_Pos'] = (probs * probs.columns).sum(axis=1)
         probs = probs.sort_values('Avg_Pos')
         probs = probs.drop(columns='Avg_Pos')
         return probs
+
+    def competition_markets(self):
+        probs = self.position_odds
+
+        num_teams = probs.shape[1]
+
+        markets = pd.DataFrame(index=probs.index)
+        markets['Champion'] = probs[1]
+        markets['Top 4'] = probs[[1,2,3,4]].sum(axis=1)
+        markets['Top 7'] = probs[[1,2,3,4,5,6,7]].sum(axis=1)
+        markets['Relegation'] = probs[[num_teams-2, num_teams-1, num_teams]].sum(axis=1)
+
+        return markets
