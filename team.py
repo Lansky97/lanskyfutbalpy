@@ -78,12 +78,13 @@ class Team:
         return teams
 
     @staticmethod
-    def update_teams(teams: Dict[str, 'Team'], new_results: pd.DataFrame, xG_factor: float = 0.6) -> None:
-        required_columns = {'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts'}
-        if not required_columns.issubset(new_results.columns):
-            missing = required_columns - set(new_results.columns)
-            raise ValueError(f"Missing columns in new_results DataFrame: {missing}")
-        for _, row in new_results.iterrows():
+    def update_teams(teams: Dict[str, 'Team'], new_results: list, xG_factor: float = 0.6) -> None:
+        required_keys = {'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts'}
+        new_results = pd.DataFrame(new_results)
+        for _,row in new_results.iterrows():
+            if not required_keys.issubset(row.keys()):
+                missing = required_keys - set(row.keys())
+                raise ValueError(f"Missing keys in new_results row: {missing}")
             try:
                 home = row['Home']
                 away = row['Away']

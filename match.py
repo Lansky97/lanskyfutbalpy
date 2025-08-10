@@ -4,7 +4,7 @@ from scipy.stats import poisson
 from team import Team
 
 class Match:
-    def __init__(self, teams, fixture, xG_factor=0.6):
+    def __init__(self, teams, fixture, xG_factor):
         self.date = fixture['Date']
         self.home_team = teams[fixture['Home']]
         self.away_team = teams[fixture['Away']]
@@ -22,18 +22,18 @@ class Match:
         return home_expected_goals, away_expected_goals
 
     @classmethod
-    def from_fixtures(cls, teams, fixtures, xG_factor, max_goals = None):
+    def from_fixtures(cls, teams, fixtures, xG_factor, max_goals = None, rng=None):
         matches = []
         for _, fixture in fixtures.iterrows():
             if max_goals is not None and 'max_goals' in cls.__init__.__code__.co_varnames:
                 match = cls(teams, fixture, xG_factor, max_goals)
             else:
-                match = cls(teams, fixture, xG_factor)
+                match = cls(teams, fixture, xG_factor, rng)
             matches.append(match)
         return matches
 
 class MarketsMatch(Match):
-    def __init__(self, teams, fixture, xG_factor=0.6, max_goals=6):
+    def __init__(self, teams, fixture, xG_factor, max_goals=6):
         super().__init__(teams, fixture, xG_factor)
         self.max_goals = max_goals
         self.score_matrix = self.get_score_matrix()
@@ -74,14 +74,13 @@ class MarketsMatch(Match):
     }
 
 class SimmedMatch(Match):
-    def __init__(self, teams, fixture, xg_factor=0.6):
+    def __init__(self, teams, fixture, xg_factor, rng):
         super().__init__(teams, fixture, xg_factor)
-        self.sim_result = self.get_sim_result()
+        self.sim_result = self.get_sim_result(rng)
 
-    def get_sim_result(self):
+    def get_sim_result(self, rng):
         home_exp, away_exp = self.match_expectation
         
-        rng = np.random.default_rng()
         home_goals = rng.poisson(home_exp)
         away_goals = rng.poisson(away_exp)
         home_points, away_points = get_points(home_goals, away_goals)
