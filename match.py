@@ -38,14 +38,15 @@ class Match:
         rng: Optional[np.random.Generator] = None
     ) -> List['Match']:
         matches: List[Match] = []
-        # Accept both DataFrame and list of dicts
-        if hasattr(fixtures, 'iterrows'):
-            iterable = fixtures.iterrows()
-            for _, fixture in iterable:
+        
+        if isinstance(fixtures, pd.DataFrame):
+            for _, fixture in fixtures.iterrows():
                 if max_goals is not None and 'max_goals' in cls.__init__.__code__.co_varnames:
                     match = cls(teams, fixture, xG_factor, max_goals)
-                else:
+                elif rng is not None and 'rng' in cls.__init__.__code__.co_varnames:
                     match = cls(teams, fixture, xG_factor, rng=rng)
+                else:
+                    match = cls(teams, fixture, xG_factor)
                 matches.append(match)
         else:
             raise TypeError("fixtures must be a DataFrame")
