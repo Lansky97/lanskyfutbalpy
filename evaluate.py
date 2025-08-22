@@ -35,7 +35,7 @@ class Evaluate:
        output = pd.DataFrame(rows, columns=["Metric Group", "Metric", "Value"])
        output["Value"] = output["Value"].round(round_digits)
 
-       order ={
+       order = {
         "PROPER":      ["rps", "brier_score", "log_loss"],
         "RANKING":    ["spearmans_rank", "kendalls_rank"],
         "POINTS": ["points_mae", "points_rmse", "points_mape", "points_r2"]
