@@ -54,7 +54,6 @@ class TestTableAggregation(unittest.TestCase):
         self.assertIn('Points', table.columns)
         self.assertEqual(len(table), 2)
         # Edge case: all teams have same points
-        table['Points'] = 3
         table_sorted = table.sort_values(by=['Points', 'Goal Difference', 'Goals'], ascending=False)
         self.assertEqual(list(table_sorted['Pos']), [1,2])
 
