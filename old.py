@@ -73,6 +73,5 @@ def matches_to_team_ratings(matches, date = None, xG_factor = 0.6):
     final_df.reset_index(drop=True, inplace=True)
     return final_df
 
-
 team_ratings = matches_to_team_ratings(matches)
 print(team_ratings)
