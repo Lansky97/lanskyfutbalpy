@@ -174,7 +174,7 @@ class Evaluate:
             'cumulative_actuals': cumulative_actuals
         }
 
-    def _prep_team_positions_and_points(self) -> None:
+    def _prep_team_positions_and_points(self) -> dict:
        actuals = self.actual_final_table[['Team', 'Pos', 'Points']].copy()
        preds = self.simulation.mean_final_table[['Team', 'Pos', 'Points']].copy()
 
