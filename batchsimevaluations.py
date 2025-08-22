@@ -1,0 +1,73 @@
+import pandas as pd 
+from league import League
+from simulation import Simulation, Config
+from evaluate import Evaluate
+from typing import Dict
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+class BatchSimEvaluator:
+    def __init__(self, input_csv: str):
+       self.inputs_df = pd.read_csv(input_csv)
+       self.league_table_cache: Dict[str, pd.DataFrame] = {}
+       self.reports = self.run_evaluator()
+
+    def get_final_league_table(self, match_data_location:str, xG_factor: float) -> pd.DataFrame:
+        cache_key = f"{match_data_location}_{xG_factor}"
+        if cache_key not in self.league_table_cache:
+            league = League.from_matches(match_data_location, pd.Timestamp.today().strftime('%Y-%m-%d'), xG_factor)
+            self.league_table_cache[cache_key] = league.league_table
+        return self.league_table_cache[cache_key]
+    
+    def run_evaluator(self) -> pd.DataFrame:
+        reports = []
+        for index, row in self.inputs_df.iterrows():
+            match_data_location = str(row['match_data_location'])
+            xG_factor = float(row['xG_factor'])
+            date_cutoff = str(row['date_cutoff'])
+            n_trials = int(row['n_trials'])
+            seed = int(row['seed'])
+
+            actual_final_table = self.get_final_league_table(match_data_location, xG_factor)
+
+            league = League.from_matches(match_data_location, date_cutoff, xG_factor)
+            config = Config(seed=seed)
+            sim = Simulation(league, n_trials=n_trials, config=config)
+
+            evaluation = Evaluate(simulation=sim, actual_final_table=actual_final_table)
+            metrics_report = evaluation.metrics_report.copy()
+
+            for column in self.inputs_df.columns:
+                metrics_report[column] = row[column]
+
+            metrics_report['run_time'] = sim.run_time
+            reports.append(metrics_report)
+
+        return pd.concat(reports, ignore_index=True)
+    
+    def plot_metrics(self, metric_group:str, tested_variable: str):
+        plot_df = self.reports[self.reports['Metric Group'].str.upper() == metric_group.upper()]
+        if plot_df.empty:
+            raise ValueError(f"No data available for metric group: '{metric_group}'")
+
+        group_metrics = plot_df['Metric'].unique()
+        plot_df = plot_df[plot_df['Metric'].isin(group_metrics)]
+        grid = sns.FacetGrid(plot_df, col='Metric', col_wrap=4, sharey=False, height=4)
+        grid.map_dataframe(sns.lineplot, x=tested_variable, y='Value', color='red', linestyle=':', marker='o', markerfacecolor='black')
+        grid.set_titles(col_template="{col_name}")
+        grid.set_axis_labels(x_var=tested_variable, y_var='Value')
+        plt.tight_layout()
+        grid.fig.suptitle(f"Metrics for {metric_group} by {tested_variable}")
+        plt.show()
+
+    def plot_run_time(self, tested_variable: str):
+ 
+        df = self.reports.drop_duplicates(subset=[tested_variable, 'run_time'])
+        plt.figure(figsize=(7, 5))
+        sns.lineplot(data=df, x=tested_variable, y='run_time', color='red', linestyle=':', marker='o', markerfacecolor='black')
+        plt.xlabel(tested_variable)
+        plt.ylabel('Simulation Run Time (seconds)')
+        plt.title(f'Simulation Run Time vs {tested_variable}')
+        plt.tight_layout()
+        plt.show()
+

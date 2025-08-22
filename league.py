@@ -28,9 +28,6 @@ class League:
 
     def __repr__(self) -> str:
         return f"League({self.name}, Teams: {len(self.teams)}, Played: {len(self.results)}, Fixtures: {len(self.fixtures)})"
-
-    def __str__(self) -> str:
-        return f"{self.name}: {len(self.teams)} teams, {len(self.results)} results, {len(self.fixtures)} fixtures"
        
     @classmethod
     def from_matches(

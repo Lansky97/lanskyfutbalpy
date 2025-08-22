@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Optional
 from league import League
+import time
 
 class Config:
     def __init__(self, seed: Optional[int] = None):
@@ -18,7 +19,9 @@ class Simulation:
         self.league = league
         self.n_trials = n_trials
         self.config = config or Config()
+        start_time = time.time()
         self.simmed_leagues: List[League] = self.simulate_season()
+        self.run_time: float = time.time() - start_time
         self.mean_final_table: pd.DataFrame = self.mean_final_table()
         self.position_odds: pd.DataFrame = self.position_odds()
         self.competition_markets: pd.DataFrame = self.competition_markets()
