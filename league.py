@@ -4,53 +4,89 @@ from utils import get_points
 from datetime import datetime
 import pandas as pd
 
-class League:
-    def __init__(self, name, matches, date_cutoff, xG_factor=0.6):
-        self.name = name
-        self.xG_factor = xG_factor
-        self.matches = matches 
-        self.date_cutoff = datetime.strptime(date_cutoff,"%Y-%m-%d")
-        self.fixtures = self.generate_fixtures()
-        self.results = self.generate_results()
-        self.teams = Team.teams_from_results(self.results, xG_factor)
-        self.league_table = self.generate_league_table()
+from typing import List, Dict, Any, Optional
 
-    def __repr__(self):
-        return f"League({self.name}, Teams: {len(self.teams)},Played: {len(self.results)}, Fixtures: {len(self.fixtures)})"
+class League:
+    def __init__(self, name: str, matches: List[Dict[str, Any]], date_cutoff: str, xG_factor: float = 0.6) -> None:
+        if not isinstance(name, str):
+            raise TypeError("name must be a string.")
+        if not isinstance(matches, list) or not all(isinstance(m, dict) for m in matches):
+            raise TypeError("matches must be a list of dicts.")
+        try:
+            self.date_cutoff = datetime.strptime(date_cutoff, "%Y-%m-%d")
+        except Exception as e:
+            raise ValueError(f"date_cutoff must be a string in YYYY-MM-DD format: {date_cutoff}") from e
+        if not isinstance(xG_factor, float):
+            raise TypeError("xG_factor must be a float.")
+        self.name: str = name
+        self.xG_factor: float = xG_factor
+        self.matches: List[Dict[str, Any]] = matches
+        self.fixtures: pd.DataFrame = self.generate_fixtures()
+        self.results: pd.DataFrame = self.generate_results()
+        self.teams: Dict[str, Team] = Team.teams_from_results(self.results, xG_factor)
+        self.league_table: pd.DataFrame = self.generate_league_table()
+
+    def __repr__(self) -> str:
+        return f"League({self.name}, Teams: {len(self.teams)}, Played: {len(self.results)}, Fixtures: {len(self.fixtures)})"
        
     @classmethod
-    def from_matches(cls, match_data = 'data/result_24_25.csv', date_cutoff = '2024-12-01', xG_factor=0.6):
-        # Get league name from the first match (assuming all matches are from the same competition)
+    def from_matches(
+        cls,
+        match_data: str = 'data/result_24_25.csv',
+        date_cutoff: str = '2024-12-01',
+        xG_factor: float = 0.6
+    ) -> 'League':
         matches = read_results(match_data)
-        league_name = matches[0]['Competition_Name'] if matches else "Unknown League"
+        if not matches or 'Competition_Name' not in matches[0]:
+            league_name = "Unknown League"
+        else:
+            league_name = matches[0]['Competition_Name']
         return cls(league_name, matches, date_cutoff, xG_factor)
-        
-    def generate_fixtures(self):
-        fixtures = []
+    
+    def update_league(self, new_results: List[Dict[str, Any]]) -> None:
+        if not isinstance(new_results, list):
+            raise TypeError("new_results must be a list of dicts.")
+        self.update_results(new_results)
+        Team.update_teams(self.teams, new_results, self.xG_factor)
+
+    def generate_fixtures(self) -> pd.DataFrame:
+        fixtures: List[Dict[str, Any]] = []
         for row in self.matches:
-            match_date = datetime.strptime(row['Date'], "%Y-%m-%d")
+            try:
+                match_date = datetime.strptime(row['Date'], "%Y-%m-%d")
+            except Exception as e:
+                raise ValueError(f"Invalid date format in fixture: {row['Date']}") from e
             if match_date <= self.date_cutoff:
                 continue
-
-            fixture = {'Date': row['Date'],
-                       'Home': row['Home'], 
-                       'Away': row['Away']}
+            for key in ['Home', 'Away', 'Date']:
+                if key not in row:
+                    raise ValueError(f"Missing key '{key}' in fixture row: {row}")
+            fixture = {'Date': row['Date'], 'Home': row['Home'], 'Away': row['Away']}
             if fixture not in fixtures:
                 fixtures.append(fixture)
         fixtures.sort(key=lambda x: x['Date'])
-        fixtures = pd.DataFrame(fixtures)
-        return fixtures
+        return pd.DataFrame(fixtures)
     
-    def update_fixtures(self, update_date):
+    def update_fixtures(self, update_date: str) -> None:
+        try:
+            update_dt = datetime.strptime(update_date, "%Y-%m-%d")
+        except Exception as e:
+            raise ValueError(f"update_date must be a string in YYYY-MM-DD format: {update_date}") from e
         self.fixtures = self.fixtures[self.fixtures['Date'] > update_date]
     
-    def generate_results(self):
-        results = []
+    def generate_results(self) -> pd.DataFrame:
+        results: List[Dict[str, Any]] = []
         for row in self.matches:
-            match_date = datetime.strptime(row['Date'], "%Y-%m-%d")
+            try:
+                match_date = datetime.strptime(row['Date'], "%Y-%m-%d")
+            except Exception as e:
+                raise ValueError(f"Invalid date format in result: {row['Date']}") from e
             if match_date > self.date_cutoff:
                 continue
-            
+            required_keys = ['Date', 'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG']
+            for key in required_keys:
+                if key not in row:
+                    raise ValueError(f"Missing key '{key}' in result row: {row}")
             results.append({
                 'Date': row['Date'],
                 'Home': row['Home'],
@@ -61,19 +97,19 @@ class League:
                 'Away_xG': row['Away_xG'],
                 'Home_pts': get_points(int(row['HomeGoals']), int(row['AwayGoals']))[0],
                 'Away_pts': get_points(int(row['HomeGoals']), int(row['AwayGoals']))[1]
-                })
-            
+            })
         results.sort(key=lambda x: datetime.strptime(x['Date'], "%Y-%m-%d"))
-        results = pd.DataFrame(results)
-        return results
+        return pd.DataFrame(results)
     
-    def update_results(self, new_results):
-        new_results = pd.DataFrame(new_results)
-        new_results = new_results.reindex(columns=self.results.columns)
-        self.results = pd.concat([self.results, new_results], ignore_index=True)
+    def update_results(self, new_results: List[Dict[str, Any]]) -> None:
+        if not isinstance(new_results, list):
+            raise TypeError("new_results must be a list of dicts.")
+        new_results_df = pd.DataFrame(new_results)
+        new_results_df = new_results_df.reindex(columns=self.results.columns)
+        self.results = pd.concat([self.results, new_results_df], ignore_index=True)
     
-    def generate_league_table(self):
-        table = []
+    def generate_league_table(self) -> pd.DataFrame:
+        table: List[Dict[str, Any]] = []
         for team in self.teams.values():
             played = team.home_games_played + team.away_games_played
             total_points = team.home_points + team.away_points
@@ -82,7 +118,6 @@ class League:
             total_xg = team.home_xg + team.away_xg
             total_xga = team.home_xga + team.away_xga
             goal_diff = total_goals - total_goals_against
-
             table.append({
                 'Team': team.name,
                 'Played': played,
@@ -92,10 +127,9 @@ class League:
                 'Goal Difference': goal_diff,
                 'xG': total_xg,
                 'xGA': total_xga
-                })
-            
+            })
         table.sort(key=lambda x: (x['Points'], x['Goal Difference'], x['Goals']), reverse=True)
-        table = pd.DataFrame(table)
-        table.insert(0, 'Pos', range(1, len(table) + 1))
-        return table
+        table_df = pd.DataFrame(table)
+        table_df.insert(0, 'Pos', range(1, len(table_df) + 1))
+        return table_df
 
