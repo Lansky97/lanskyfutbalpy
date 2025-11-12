@@ -1,6 +1,7 @@
 from datetime import datetime
 import pandas as pd
 from typing import Dict, Any, Optional, Type, Tuple
+from utils import read_last_season_stats
 
 class Team:
     def __init__(self, name: str) -> None:
@@ -17,6 +18,14 @@ class Team:
         self.away_xg: float = 0.0
         self.home_xga: float = 0.0
         self.away_xga: float = 0.0
+        self.home_attack_strength_cs: float = 0.0
+        self.away_attack_strength_cs: float = 0.0
+        self.home_defence_strength_cs: float = 0.0
+        self.away_defence_strength_cs: float = 0.0
+        self.home_attack_strength_ls: float = 0.0
+        self.away_attack_strength_ls: float = 0.0
+        self.home_defence_strength_ls: float = 0.0
+        self.away_defence_strength_ls: float = 0.0
         self.home_attack_strength: float = 0.0
         self.away_attack_strength: float = 0.0
         self.home_defence_strength: float = 0.0
@@ -74,8 +83,48 @@ class Team:
             teams[away].away_points += away_pts
 
         league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
-        Team.calculate_team_strengths(teams, league_avg_home, league_avg_away, xG_factor)
+        Team.calculate_team_strengths_cs(teams, league_avg_home, league_avg_away, xG_factor)
         return teams
+    
+    @classmethod
+    def teams_from_results_advanced(cls: Type['Team'], results: pd.DataFrame, last_season_strengths: pd.DataFrame, last_season_factor: float) -> Dict[str, 'Team']:
+        teams = cls.teams_from_results(results)
+
+        for _, row in last_season_strengths.iterrows():
+            team_name = row['team']
+            if team_name in teams:
+                teams[team_name].home_attack_strength_ls = row.get('home_attack_strength', 0.0)
+                teams[team_name].home_defence_strength_ls = row.get('home_defense_strength', 0.0)
+                teams[team_name].away_attack_strength_ls = row.get('away_attack_strength', 0.0)
+                teams[team_name].away_defence_strength_ls = row.get('away_defense_strength', 0.0)
+
+        Team.calculate_team_strengths(teams, last_season_factor)
+
+    @staticmethod
+    def calculate_team_strengths(teams: Dict[str, 'Team'], last_season_factor: float = 0.5) -> None:
+        for team in teams.values():
+            if team.home_attack_strength_cs == 0.0:
+                team.home_attack_strength = team.home_attack_strength_ls
+            else:
+                team.home_attack_strength = ((team.home_attack_strength_ls * last_season_factor) +
+                                              (team.home_attack_strength_cs * (1 - last_season_factor)))
+                
+            if team.home_defence_strength_cs == 0.0:
+                team.home_defence_strength = team.home_defence_strength_ls
+            else:
+                team.home_defence_strength = ((team.home_defence_strength_ls * last_season_factor) +
+                                               (team.home_defence_strength_cs * (1 - last_season_factor)))
+            if team.away_attack_strength_cs == 0.0:
+                team.away_attack_strength = team.away_attack_strength_ls
+            else:
+                team.away_attack_strength = ((team.away_attack_strength_ls * last_season_factor) +
+                                              (team.away_attack_strength_cs * (1 - last_season_factor)))
+            if team.away_defence_strength_cs == 0.0:
+                team.away_defence_strength = team.away_defence_strength_ls
+            else:
+                team.away_defence_strength = ((team.away_defence_strength_ls * last_season_factor) +
+                                               (team.away_defence_strength_cs * (1 - last_season_factor)))
+
 
     @staticmethod
     def update_teams(teams: Dict[str, 'Team'], new_results: list, xG_factor: float = 0.6) -> None:
@@ -132,23 +181,23 @@ class Team:
         return league_avg_home, league_avg_away
     
     @staticmethod
-    def calculate_team_strengths(
+    def calculate_team_strengths_cs(
         teams: Dict[str, 'Team'], league_avg_home: float, league_avg_away: float, xG_factor: float = 0.6
     ) -> None:
         for team in teams.values():
             if team.home_games_played > 0 and league_avg_home > 0:
                 smoothed_home_goals = (1-xG_factor)*team.home_goals + xG_factor*team.home_xg
                 smoothed_home_goals_against = (1-xG_factor)*team.home_goals_against + xG_factor*team.home_xga
-                team.home_attack_strength = round(smoothed_home_goals / (team.home_games_played * league_avg_home), 2)
-                team.home_defence_strength = round(smoothed_home_goals_against / (team.home_games_played * league_avg_away), 2)
+                team.home_attack_strength_cs = round(smoothed_home_goals / (team.home_games_played * league_avg_home), 2)
+                team.home_defence_strength_cs = round(smoothed_home_goals_against / (team.home_games_played * league_avg_away), 2)
             else:
-                team.home_attack_strength = 0.0
-                team.home_defence_strength = 0.0
+                team.home_attack_strength_cs = 0.0
+                team.home_defence_strength_cs = 0.0
             if team.away_games_played > 0 and league_avg_away > 0:
                 smoothed_away_goals = (1-xG_factor)*team.away_goals + xG_factor*team.away_xg
                 smoothed_away_goals_against = (1-xG_factor)*team.away_goals_against + xG_factor*team.away_xga
-                team.away_attack_strength = round(smoothed_away_goals / (team.away_games_played * league_avg_away), 2)
-                team.away_defence_strength = round(smoothed_away_goals_against / (team.away_games_played * league_avg_home), 2)
+                team.away_attack_strength_cs = round(smoothed_away_goals / (team.away_games_played * league_avg_away), 2)
+                team.away_defence_strength_cs = round(smoothed_away_goals_against / (team.away_games_played * league_avg_home), 2)
             else:
-                team.away_attack_strength = 0.0
-                team.away_defence_strength = 0.0
+                team.away_attack_strength_cs = 0.0
+                team.away_defence_strength_cs = 0.0

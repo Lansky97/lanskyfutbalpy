@@ -1,5 +1,5 @@
 from team import Team
-from utils import read_results
+from utils import read_schedule
 from utils import get_points
 from datetime import datetime
 import pandas as pd
@@ -36,7 +36,22 @@ class League:
         date_cutoff: str = '2024-12-01',
         xG_factor: float = 0.6
     ) -> 'League':
-        matches = read_results(match_data)
+        matches = read_schedule(filepath = match_data)
+        if not matches or 'Competition_Name' not in matches[0]:
+            league_name = "Unknown League"
+        else:
+            league_name = matches[0]['Competition_Name']
+        return cls(league_name, matches, date_cutoff, xG_factor)
+    
+    @classmethod
+    def from_database(
+        cls,
+        season_end_year: int = 2024,
+        league: str = 'Premier_League',
+        date_cutoff: str = '2024-12-01',
+        xG_factor: float = 0.6
+    ) -> 'League':
+        matches = read_schedule(season_end_year=season_end_year, league=league)
         if not matches or 'Competition_Name' not in matches[0]:
             league_name = "Unknown League"
         else:
@@ -133,3 +148,4 @@ class League:
         table_df.insert(0, 'Pos', range(1, len(table_df) + 1))
         return table_df
 
+   # def get_last_season_strength()
