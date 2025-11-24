@@ -3,11 +3,11 @@ from utils import read_schedule
 from utils import get_points
 from datetime import datetime
 import pandas as pd
-
+from utils import read_last_season_stats
 from typing import List, Dict, Any, Optional
 
 class League:
-    def __init__(self, name: str, matches: List[Dict[str, Any]], date_cutoff: str, xG_factor: float = 0.6) -> None:
+    def __init__(self, name: str, matches: List[Dict[str, Any]], date_cutoff: str, xG_factor: float = 0.6, last_season_factor: float = None) -> None:
         if not isinstance(name, str):
             raise TypeError("name must be a string.")
         if not isinstance(matches, list) or not all(isinstance(m, dict) for m in matches):
@@ -20,11 +20,13 @@ class League:
             raise TypeError("xG_factor must be a float.")
         self.name: str = name
         self.xG_factor: float = xG_factor
+        self.last_season_factor: float = last_season_factor
         self.matches: List[Dict[str, Any]] = matches
         self.fixtures: pd.DataFrame = self.generate_fixtures()
-        self.results: pd.DataFrame = self.generate_results()
-        self.teams: Dict[str, Team] = Team.teams_from_results(self.results, xG_factor)
-        self.league_table: pd.DataFrame = self.generate_league_table()
+        self.results: pd.DataFrame = self.generate_results()            
+        self.teams: Dict[str, Team] = None
+        self.league_table: pd.DataFrame = None
+        
 
     def __repr__(self) -> str:
         return f"League({self.name}, Teams: {len(self.teams)}, Played: {len(self.results)}, Fixtures: {len(self.fixtures)})"
@@ -41,28 +43,45 @@ class League:
             league_name = "Unknown League"
         else:
             league_name = matches[0]['Competition_Name']
-        return cls(league_name, matches, date_cutoff, xG_factor)
+        lge = cls(league_name, matches, date_cutoff, xG_factor)
+        lge.teams = Team.teams_from_results(lge.results,lge.xG_factor)
+        lge.league_table = lge.generate_league_table()
+        return lge
     
     @classmethod
     def from_database(
         cls,
-        season_end_year: int = 2024,
+        season_end_year: int = 2025,
         league: str = 'Premier_League',
+        tier: int = 1,
         date_cutoff: str = '2024-12-01',
-        xG_factor: float = 0.6
+        xG_factor: float = 0.6,
+        last_season_factor: float = 0.5
     ) -> 'League':
         matches = read_schedule(season_end_year=season_end_year, league=league)
         if not matches or 'Competition_Name' not in matches[0]:
             league_name = "Unknown League"
+            country = "England" # Default fallback
         else:
             league_name = matches[0]['Competition_Name']
-        return cls(league_name, matches, date_cutoff, xG_factor)
+            country = matches[0].get('Country', 'England')
+
+        if last_season_factor == 0 or last_season_factor is None:
+            last_season_stats = None
+        else:    
+            last_season_stats = read_last_season_stats(season_end_year=season_end_year, country=country, tier=tier, xg_factor=xG_factor)
+        
+        lge = cls(league_name, matches, date_cutoff, xG_factor, last_season_factor)
+        lge.teams = Team.teams_from_results(lge.results, lge.xG_factor, lge.last_season_factor, last_season_stats)
+        lge.last_season_stats = last_season_stats
+        lge.league_table = lge.generate_league_table()
+        return lge
     
     def update_league(self, new_results: List[Dict[str, Any]]) -> None:
         if not isinstance(new_results, list):
             raise TypeError("new_results must be a list of dicts.")
         self.update_results(new_results)
-        Team.update_teams(self.teams, new_results, self.xG_factor)
+        Team.update_teams(self.teams, new_results, self.xG_factor, self.last_season_factor)
 
     def generate_fixtures(self) -> pd.DataFrame:
         fixtures: List[Dict[str, Any]] = []
