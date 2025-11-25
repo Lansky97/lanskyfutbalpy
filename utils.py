@@ -1,7 +1,13 @@
 import csv
-import pandas as pd
+import duckdb as ddb
 
-def read_results(file_path):
+def read_schedule(filepath = None, season_end_year = None, league = None):
+    if filepath:
+        return read_schedule_from_csv(filepath)
+    else:
+        return read_schedule_from_database(season_end_year, league)
+
+def read_schedule_from_csv(file_path):
     results = []
     with open(file_path,'r') as file:
         reader = csv.DictReader(file)
