@@ -1,7 +1,5 @@
-from datetime import datetime
 import pandas as pd
-from typing import Dict, Any, Optional, Type, Tuple
-from utils import read_last_season_stats
+from typing import Dict, Type, Tuple, Any
 
 class Team:
     def __init__(self, name: str) -> None:
@@ -116,36 +114,27 @@ class Team:
                 team.away_defence_strength = team.away_defence_strength_cs
         else:
             if init:
-                for _, row in last_season_strengths.iterrows():
-                    team_name = row['team']
-                    for team in teams.values():
-                        if team_name == team.name:
-                            team.home_attack_strength_ls = row.get('home_attack_strength', 0.0)
-                            team.home_defence_strength_ls = row.get('home_defense_strength', 0.0)
-                            team.away_attack_strength_ls = row.get('away_attack_strength', 0.0)
-                            team.away_defence_strength_ls = row.get('away_defense_strength', 0.0)
+                ls_dict = {row['team']: row for _, row in last_season_strengths.iterrows()}
+                for team in teams.values():
+                    if team.name in ls_dict:
+                        row = ls_dict[team.name]
+                        team.home_attack_strength_ls = row.get('home_attack_strength', 0.0)
+                        team.home_defence_strength_ls = row.get('home_defence_strength', 0.0)
+                        team.away_attack_strength_ls = row.get('away_attack_strength', 0.0)
+                        team.away_defence_strength_ls = row.get('away_defence_strength', 0.0)
 
             for team in teams.values():
-                if team.home_attack_strength_cs == 0.0:
-                    team.home_attack_strength = team.home_attack_strength_ls
-                else:
-                    team.home_attack_strength = ((team.home_attack_strength_ls * last_season_factor) +
-                                                  (team.home_attack_strength_cs * (1 - last_season_factor)))
-                if team.home_defence_strength_cs == 0.0:
-                    team.home_defence_strength = team.home_defence_strength_ls
-                else:
-                    team.home_defence_strength = ((team.home_defence_strength_ls * last_season_factor) +
-                                                  (team.home_defence_strength_cs * (1 - last_season_factor)))
-                if team.away_attack_strength_cs == 0.0:
-                    team.away_attack_strength = team.away_attack_strength_ls
-                else:
-                    team.away_attack_strength = ((team.away_attack_strength_ls * last_season_factor) +
-                                                  (team.away_attack_strength_cs * (1 - last_season_factor)))
-                if team.away_defence_strength_cs == 0.0:
-                    team.away_defence_strength = team.away_defence_strength_ls
-                else:
-                    team.away_defence_strength = ((team.away_defence_strength_ls * last_season_factor) +
-                                                  (team.away_defence_strength_cs * (1 - last_season_factor)))
+                team.home_attack_strength = Team.combine_strengths(team.home_attack_strength_cs, team.home_attack_strength_ls, last_season_factor)
+                team.home_defence_strength = Team.combine_strengths(team.home_defence_strength_cs, team.home_defence_strength_ls, last_season_factor)
+                team.away_attack_strength = Team.combine_strengths(team.away_attack_strength_cs, team.away_attack_strength_ls, last_season_factor)
+                team.away_defence_strength = Team.combine_strengths(team.away_defence_strength_cs, team.away_defence_strength_ls, last_season_factor)
+
+    @staticmethod
+    def combine_strengths(cs_strength: float, ls_strength: float, last_season_factor: float) -> float:
+        if cs_strength == 0:
+            return ls_strength
+        else:
+            return (ls_strength * last_season_factor) + (cs_strength * (1 - last_season_factor))
 
     @staticmethod
     def update_teams(teams: Dict[str, 'Team'], new_results: list, xG_factor: float = 0.6, last_season_factor: float = None) -> None:
