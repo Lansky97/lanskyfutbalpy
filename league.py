@@ -166,5 +166,3 @@ class League:
         table_df = pd.DataFrame(table)
         table_df.insert(0, 'Pos', range(1, len(table_df) + 1))
         return table_df
-
-   # def get_last_season_strength()
