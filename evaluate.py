@@ -35,7 +35,7 @@ class Evaluate:
        output = pd.DataFrame(rows, columns=["Metric Group", "Metric", "Value"])
        output["Value"] = output["Value"].round(round_digits)
 
-       order ={
+       order = {
         "PROPER":      ["rps", "brier_score", "log_loss"],
         "RANKING":    ["spearmans_rank", "kendalls_rank"],
         "POINTS": ["points_mae", "points_rmse", "points_mape", "points_r2"]
@@ -174,7 +174,7 @@ class Evaluate:
             'cumulative_actuals': cumulative_actuals
         }
 
-    def _prep_team_positions_and_points(self) -> None:
+    def _prep_team_positions_and_points(self) -> dict:
        actuals = self.actual_final_table[['Team', 'Pos', 'Points']].copy()
        preds = self.simulation.mean_final_table[['Team', 'Pos', 'Points']].copy()
 
