@@ -66,7 +66,7 @@ class League:
             league_name = matches[0]['Competition_Name']
             country = matches[0].get('Country', 'England')
 
-        if last_season_factor == 0 or last_season_factor is None:
+        if last_season_factor == 0.0 or last_season_factor is None:
             last_season_stats = None
         else:    
             last_season_stats = read_last_season_stats(season_end_year=season_end_year, country=country, tier=tier, xg_factor=xG_factor)
