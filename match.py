@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from utils import get_points
 from scipy.stats import poisson
 from team import Team
@@ -10,6 +9,8 @@ class Match:
         for key in ['Date', 'Home', 'Away']:
             if key not in fixture:
                 raise ValueError(f"Missing key '{key}' in fixture: {fixture}")
+        if fixture['Home'] not in teams or fixture['Away'] not in teams:
+            raise ValueError(f"Fixture references unknown teams: {fixture['Home']} or {fixture['Away']}")
         self.date: str = fixture['Date']
         self.home_team: Team = teams[fixture['Home']]
         self.away_team: Team = teams[fixture['Away']]
@@ -32,24 +33,22 @@ class Match:
     def from_fixtures(
         cls,
         teams: Dict[str, Team],
-        fixtures: pd.DataFrame,
+        fixtures: List[Dict[str, Any]],
         xG_factor: float,
         max_goals: Optional[int] = None,
         rng: Optional[np.random.Generator] = None
     ) -> List['Match']:
-        matches: List[Match] = []
+        if not isinstance(fixtures, list) or not all(isinstance(f, dict) for f in fixtures):
+            raise TypeError("fixtures must be a list of dicts")
         
-        if isinstance(fixtures, pd.DataFrame):
-            for _, fixture in fixtures.iterrows():
-                if max_goals is not None and 'max_goals' in cls.__init__.__code__.co_varnames:
-                    match = cls(teams, fixture, xG_factor, max_goals)
-                elif rng is not None and 'rng' in cls.__init__.__code__.co_varnames:
-                    match = cls(teams, fixture, xG_factor, rng=rng)
-                else:
-                    match = cls(teams, fixture, xG_factor)
-                matches.append(match)
-        else:
-            raise TypeError("fixtures must be a DataFrame")
+        matches: List[Match] = []
+
+        for fixture in fixtures:
+            if cls.__name__ == 'MarketsMatch':
+                match = cls(teams, fixture, xG_factor, max_goals=max_goals if max_goals is not None else 6)
+            else:
+                match = cls(teams, fixture, xG_factor, rng=rng)
+            matches.append(match)
         return matches
 
 class MarketsMatch(Match):
