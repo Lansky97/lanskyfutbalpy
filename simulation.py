@@ -38,10 +38,11 @@ class Simulation:
         baseline_league = self._league_snapshot()
 
         for _ in range(self.n_trials):
-            self._league_restore(baseline_league)
 
             for match_date, md_fixtures in ordered_dates:
-                day_matches = SimmedMatch.from_fixtures(self.league.teams, md_fixtures, self.league.xG_factor, rng=rng)
+                day_matches = SimmedMatch.from_fixtures(
+                    self.league.teams, md_fixtures, self.league.league_avg_home,
+                    self.league.league_avg_away, self.league.xG_factor, rng=rng)
                 md_results = [match.sim_result for match in day_matches]
                 self.league.update_league(md_results)
 
@@ -57,13 +58,20 @@ class Simulation:
             trial.results = self.league.results
             trial.league_table = self.league.generate_league_table()
             simmed_leagues.append(trial)
-
+            self._league_restore(baseline_league)
         return simmed_leagues
 
     def _league_snapshot(self) -> Dict[str, Any]:
         return {
             'teams': self._teams_snapshot(self.league.teams),
-            'results_len': len(self.league.results)
+            'results_len': len(self.league.results),
+            'total_home_goals': self.league.total_home_goals,
+            'total_away_goals': self.league.total_away_goals,
+            'total_home_xg': self.league.total_home_xg,
+            'total_away_xg': self.league.total_away_xg,
+            'league_avg_home': self.league.league_avg_home,
+            'league_avg_away': self.league.league_avg_away,
+            'games_played': self.league.games_played
         }
 
     def _league_restore(self, snapshot: Dict[str, Any]) -> None:
@@ -72,6 +80,14 @@ class Simulation:
         baseline_len = snapshot['results_len']
         if len(self.league.results) != baseline_len:
             del self.league.results[baseline_len:]
+
+        self.league.total_home_goals = snapshot['total_home_goals']
+        self.league.total_away_goals = snapshot['total_away_goals']
+        self.league.total_home_xg = snapshot['total_home_xg']
+        self.league.total_away_xg = snapshot['total_away_xg']
+        self.league.league_avg_home = snapshot['league_avg_home']
+        self.league.league_avg_away = snapshot['league_avg_away']
+        self.league.games_played = snapshot['games_played']
 
     def _teams_snapshot(self, teams: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         fields = (
@@ -89,9 +105,7 @@ class Simulation:
     
     def _restore_teams(self, teams: Dict[str, Any], snapshot: Dict[str, Dict[str, Any]]) -> None:
         for name, state in snapshot.items():
-            team = teams[name]
-            for field, value in state.items():
-                setattr(team, field, value)
+            teams[name].__dict__.update(state)
 
     def mean_final_table(self):
 

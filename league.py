@@ -28,9 +28,33 @@ class League:
         self.results: List[Dict[str, Any]] = self.generate_results()            
         self.teams: Dict[str, Team] = {}
         self.league_table: List[Dict[str, Any]] = []
+        self.total_home_goals: int = 0
+        self.total_away_goals: int = 0
+        self.total_home_xg: float = 0.0
+        self.total_away_xg: float = 0.0
+        self.games_played: int = len(self.results)
+        self.league_avg_home: float = 0.0
+        self.league_avg_away: float = 0.0
+
+        for result in self.results:
+            self.total_home_goals += int(result['HomeGoals'])
+            self.total_away_goals += int(result['AwayGoals'])
+            self.total_home_xg += float(result['Home_xG'])
+            self.total_away_xg += float(result['Away_xG'])  
+
+        xG_inverse = 1 - xG_factor
+
+        if self.games_played == 0:
+            self.league_avg_home, self.league_avg_away = 1.0, 1.0
+        else:
+            smooth_home_goals = xG_inverse*self.total_home_goals + xG_factor*self.total_home_xg
+            smooth_away_goals = xG_inverse*self.total_away_goals + xG_factor*self.total_away_xg
+            self.league_avg_home = smooth_home_goals / self.games_played
+            self.league_avg_away = smooth_away_goals / self.games_played
+
 
     def __repr__(self) -> str:
-        return f"League({self.name}, Teams: {len(self.teams)}, Played: {len(self.results)}, Fixtures: {len(self.fixtures)})"
+        return f"League({self.name}, Teams: {len(self.teams)}, Played: {self.games_played}, Fixtures: {len(self.fixtures)})"
        
     @classmethod
     def from_matches(
@@ -45,7 +69,9 @@ class League:
         else:
             league_name = matches[0]['Competition_Name']
         lge = cls(league_name, matches, date_cutoff, xG_factor)
-        lge.teams = Team.teams_from_results(lge.results,lge.xG_factor)
+        lge.teams = Team.teams_from_results(
+            lge.results, lge.league_avg_home, lge.league_avg_away, lge.xG_factor
+            )
         lge.league_table = lge.generate_league_table()
         return lge
     
@@ -73,28 +99,49 @@ class League:
             last_season_stats = read_last_season_stats(season_end_year=season_end_year, country=country, tier=tier, xg_factor=xG_factor)
         
         lge = cls(league_name, matches, date_cutoff, xG_factor, last_season_factor)
-        lge.teams = Team.teams_from_results(lge.results, lge.xG_factor, lge.last_season_factor, last_season_stats)
+        lge.teams = Team.teams_from_results(
+            lge.results, lge.league_avg_home, lge.league_avg_away,
+            lge.xG_factor, lge.last_season_factor, last_season_stats)
         lge.last_season_stats = last_season_stats
         lge.league_table = lge.generate_league_table()
         return lge
     
     def update_league(self, new_results: List[Dict[str, Any]]) -> None:
-        if not isinstance(new_results, list):
-            raise TypeError("new_results must be a list of dicts.")
-        self.update_results(new_results)
-        Team.update_teams(self.teams, new_results, self.xG_factor, self.last_season_factor)
+        for result in new_results:
+            self.total_home_goals += int(result['HomeGoals'])
+            self.total_away_goals += int(result['AwayGoals'])
+            self.total_home_xg += float(result['Home_xG'])
+            self.total_away_xg += float(result['Away_xG'])
+        
+        self.games_played += len(new_results)
+        xG_inverse = 1 - self.xG_factor
+        smooth_home_goals = xG_inverse*self.total_home_goals + self.xG_factor*self.total_home_xg
+        smooth_away_goals = xG_inverse*self.total_away_goals + self.xG_factor*self.total_away_xg
+        self.league_avg_home = smooth_home_goals / self.games_played
+        self.league_avg_away = smooth_away_goals / self.games_played
+        self.results.extend(new_results)
+        
+        Team.update_teams(
+            self.teams, new_results, self.league_avg_home, self.league_avg_away,
+            self.xG_factor, self.last_season_factor
+            )
 
     def generate_fixtures(self) -> List[Dict[str, Any]]:
         fixtures: List[Dict[str, Any]] = []
+        seen_fixtures = set()
         for row in self.matches:
             if row['Date'] <= self.date_cutoff_str:
                 continue
-            for key in ['Home', 'Away', 'Date']:
-                if key not in row:
-                    raise ValueError(f"Missing key '{key}' in fixture row: {row}")
-            fixture = {'Date': row['Date'], 'Home': row['Home'], 'Away': row['Away']}
-            if not any(f['Date'] == fixture['Date'] and f['Home'] == fixture['Home'] and f['Away'] == fixture['Away'] for f in fixtures):
-                fixtures.append(fixture)
+
+            unique_key = (row['Date'], row['Home'], row['Away'])
+            if unique_key not in seen_fixtures:
+                seen_fixtures.add(unique_key)
+                fixtures.append({
+                    'Date': row['Date'], 
+                    'Home': row['Home'],
+                    'Away': row['Away']
+                })
+
         fixtures.sort(key=lambda x: x['Date'])
         return fixtures
     
@@ -130,22 +177,6 @@ class League:
             })
         results.sort(key=lambda x: x['Date'])
         return results
-    
-    @profile    
-    def update_results(self, new_results: List[Dict[str, Any]]) -> None:
-        if not isinstance(new_results, list):
-            raise TypeError("new_results must be a list of dicts.")
-        required = set(self.results[0].keys()) if self.results else {
-            'Date', 'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts'
-        }
-        cleaned: list[Dict[str, Any]] = []
-        for row in new_results: 
-            if not required.issubset(row.keys()):
-                missing = required - set(row.keys())
-                raise ValueError(f"Missing keys in new_results row: {row}. Required keys: {missing}")
-            cleaned.append({col: row[col] for col in required})
-        self.results.extend(cleaned)
-        self.results.sort(key=lambda x: x['Date'])
     
     def generate_league_table(self) -> List[Dict[str, Any]]:
         table: List[Dict[str, Any]] = []
