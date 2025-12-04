@@ -12,25 +12,69 @@ class BatchSimEvaluator:
        self.league_table_cache: Dict[str, pd.DataFrame] = {}
        self.reports = self.run_evaluator()
 
-    def get_final_league_table(self, match_data_location:str, xG_factor: float) -> pd.DataFrame:
-        cache_key = f"{match_data_location}_{xG_factor}"
-        if cache_key not in self.league_table_cache:
-            league = League.from_matches(match_data_location, pd.Timestamp.today().strftime('%Y-%m-%d'), xG_factor)
-            self.league_table_cache[cache_key] = league.league_table
-        return self.league_table_cache[cache_key]
+    def _cache_key(self, params: Dict) -> str:
+        return "|".join(f"{k}={params[k]}" for k in sorted(params.keys()))
+
+    def get_final_league_table_csv(self, match_data_location: str, xG_factor: float) -> pd.DataFrame:
+        params = {
+            "mode": "csv",
+            "match_data_location": match_data_location,
+            "date_cutoff": "2100-01-01"
+        }
+        key = self._cache_key(params)
+        if key not in self.league_table_cache:
+            league = League.from_matches(match_data_location, params["date_cutoff"], xG_factor)
+            self.league_table_cache[key] = league.league_table
+        return pd.DataFrame(self.league_table_cache[key])
+    
+    def get_final_league_table_db(self, season_end_year: int, league: str, tier: int,
+                                  xG_factor: float, last_season_factor: float) -> pd.DataFrame:
+        params = {
+            "mode": "db",
+            "season_end_year": season_end_year,
+            "league": league,
+            "date_cutoff": "2100-01-01" 
+        }
+        key = self._cache_key(params)
+        if key not in self.league_table_cache:
+            lge = League.from_database(
+                season_end_year=season_end_year,
+                league=league,
+                tier=tier,
+                date_cutoff=params["date_cutoff"],
+                xG_factor=xG_factor,
+                last_season_factor=last_season_factor
+            )
+            self.league_table_cache[key] = lge.league_table
+        return pd.DataFrame(self.league_table_cache[key])
     
     def run_evaluator(self) -> pd.DataFrame:
         reports = []
-        for index, row in self.inputs_df.iterrows():
-            match_data_location = str(row['match_data_location'])
+        for _, row in self.inputs_df.iterrows():
+            is_db = {'season_end_year', 'league', 'tier'}.issubset(row.index)
             xG_factor = float(row['xG_factor'])
             date_cutoff = str(row['date_cutoff'])
             n_trials = int(row['n_trials'])
             seed = int(row['seed'])
+            if is_db:
+                season_end_year = int(row['season_end_year'])
+                league_name = str(row['league'])
+                tier = int(row['tier'])
+                xG_factor = float(row['xG_factor'])
+                last_season_factor = float(row['last_season_factor'])
+                actual_final_table = self.get_final_league_table_db(
+                    season_end_year, league_name, tier, xG_factor, last_season_factor
+                )
+                league = League.from_database(
+                    season_end_year, league_name, tier, date_cutoff, xG_factor, last_season_factor
+                )
+            else:
+                match_data_location = str(row['match_data_location'])
+                actual_final_table = self.get_final_league_table_csv(
+                    match_data_location, xG_factor
+                )
+                league = League.from_matches(match_data_location, date_cutoff, xG_factor)
 
-            actual_final_table = self.get_final_league_table(match_data_location, xG_factor)
-
-            league = League.from_matches(match_data_location, date_cutoff, xG_factor)
             config = Config(seed=seed)
             sim = Simulation(league, n_trials=n_trials, config=config)
 
