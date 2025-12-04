@@ -89,7 +89,7 @@ class Team:
                 teams[home].home_points += home_pts
                 teams[away].away_points += away_pts
 
-        if not last_season_strengths or not isinstance(last_season_factor, (float, int)) or last_season_factor == 0:
+        if not last_season_strengths or not isinstance(last_season_factor, (float, int)):
             Team.calculate_team_strengths(
                 teams, league_avg_home, 
                 league_avg_away, xG_factor, init=True)
@@ -110,25 +110,14 @@ class Team:
         init: bool = False
         ) -> None:
         xG_inverse = 1 - xG_factor
-        use_lsf = last_season_factor is not None and last_season_factor != 0 and last_season_strengths is not None
+        use_lsf = last_season_factor is not None
         inverse_lsf = (1.0 - last_season_factor) if use_lsf else 0.0
 
         ls_map = None
-        if use_lsf and init:
+        if init and last_season_strengths:
             ls_map = {row['team']: row for row in last_season_strengths}
 
         for team in teams.values():
-            if team.home_games_played > 0 and league_avg_home > 0:
-                smoothed_home_goals = xG_inverse*team.home_goals + xG_factor*team.home_xg
-                smoothed_home_goals_against = xG_inverse*team.home_goals_against + xG_factor*team.home_xga
-                team.home_attack_strength_cs = smoothed_home_goals / (team.home_games_played * league_avg_home)
-                team.home_defence_strength_cs = smoothed_home_goals_against / (team.home_games_played * league_avg_away)
-
-            if team.away_games_played > 0 and league_avg_away > 0:
-                smoothed_away_goals = xG_inverse*team.away_goals + xG_factor*team.away_xg
-                smoothed_away_goals_against = xG_inverse*team.away_goals_against + xG_factor*team.away_xga
-                team.away_attack_strength_cs = smoothed_away_goals / (team.away_games_played * league_avg_away) 
-                team.away_defence_strength_cs = smoothed_away_goals_against / (team.away_games_played * league_avg_home)
 
             if ls_map:
                 row = ls_map.get(team.name, {})
@@ -136,6 +125,32 @@ class Team:
                 team.home_defence_strength_ls = float(row.get('home_defence_strength', 0.0))
                 team.away_attack_strength_ls = float(row.get('away_attack_strength', 0.0))
                 team.away_defence_strength_ls = float(row.get('away_defence_strength', 0.0))
+
+            if team.home_games_played > 0 and league_avg_home > 0:
+                smoothed_home_goals = xG_inverse*team.home_goals + xG_factor*team.home_xg
+                smoothed_home_goals_against = xG_inverse*team.home_goals_against + xG_factor*team.home_xga
+                team.home_attack_strength_cs = smoothed_home_goals / (team.home_games_played * league_avg_home)
+                team.home_defence_strength_cs = smoothed_home_goals_against / (team.home_games_played * league_avg_away)
+            else:
+                if use_lsf:
+                    team.home_attack_strength_cs = team.home_attack_strength_ls
+                    team.home_defence_strength_cs = team.home_defence_strength_ls
+                else:
+                    team.home_attack_strength_cs = 1.0
+                    team.home_defence_strength_cs = 1.0
+
+            if team.away_games_played > 0 and league_avg_away > 0:
+                smoothed_away_goals = xG_inverse*team.away_goals + xG_factor*team.away_xg
+                smoothed_away_goals_against = xG_inverse*team.away_goals_against + xG_factor*team.away_xga
+                team.away_attack_strength_cs = smoothed_away_goals / (team.away_games_played * league_avg_away) 
+                team.away_defence_strength_cs = smoothed_away_goals_against / (team.away_games_played * league_avg_home)
+            else:
+                if use_lsf:
+                    team.away_attack_strength_cs = team.away_attack_strength_ls
+                    team.away_defence_strength_cs = team.away_defence_strength_ls
+                else:
+                    team.away_attack_strength_cs = 1.0
+                    team.away_defence_strength_cs = 1.0
 
             if not use_lsf:
                 team.home_attack_strength = team.home_attack_strength_cs

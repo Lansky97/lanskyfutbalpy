@@ -50,6 +50,7 @@ class BatchSimEvaluator:
     
     def run_evaluator(self) -> pd.DataFrame:
         reports = []
+        sim_count = 0
         for _, row in self.inputs_df.iterrows():
             is_db = {'season_end_year', 'league', 'tier'}.issubset(row.index)
             xG_factor = float(row['xG_factor'])
@@ -60,7 +61,6 @@ class BatchSimEvaluator:
                 season_end_year = int(row['season_end_year'])
                 league_name = str(row['league'])
                 tier = int(row['tier'])
-                xG_factor = float(row['xG_factor'])
                 last_season_factor = float(row['last_season_factor'])
                 actual_final_table = self.get_final_league_table_db(
                     season_end_year, league_name, tier, xG_factor, last_season_factor
@@ -76,6 +76,8 @@ class BatchSimEvaluator:
                 league = League.from_matches(match_data_location, date_cutoff, xG_factor)
 
             config = Config(seed=seed)
+            sim_count += 1
+            print(f"Running simulation {sim_count}")
             sim = Simulation(league, n_trials=n_trials, config=config)
 
             evaluation = Evaluate(simulation=sim, actual_final_table=actual_final_table)
@@ -88,8 +90,8 @@ class BatchSimEvaluator:
             reports.append(metrics_report)
 
         return pd.concat(reports, ignore_index=True)
-    
-    def plot_metrics(self, metric_group:str, tested_variable: str):
+
+    def plot_metrics(self, metric_group:str, tested_variable: str, group_by: str = None):
         plot_df = self.reports[self.reports['Metric Group'].str.upper() == metric_group.upper()]
         if plot_df.empty:
             raise ValueError(f"No data available for metric group: '{metric_group}'")
@@ -97,11 +99,26 @@ class BatchSimEvaluator:
         group_metrics = plot_df['Metric'].unique()
         plot_df = plot_df[plot_df['Metric'].isin(group_metrics)]
         grid = sns.FacetGrid(plot_df, col='Metric', col_wrap=4, sharey=False, height=4)
-        grid.map_dataframe(sns.lineplot, x=tested_variable, y='Value', color='red', linestyle=':', marker='o', markerfacecolor='black')
+
+        if group_by:
+            grid.map_dataframe(sns.lineplot, x=tested_variable, y='Value', hue=group_by, 
+                               marker='o', palette='tab10')
+            grid.add_legend(title=group_by)
+        else:
+            grid.map_dataframe(sns.lineplot, x=tested_variable, y='Value', color='red', 
+                               linestyle=':', marker='o', markerfacecolor='black')
+
         grid.set_titles(col_template="{col_name}")
         grid.set_axis_labels(x_var=tested_variable, y_var='Value')
+
+        for ax in grid.axes.flat:
+            for label in ax.get_xticklabels():
+                label.set_rotation(45)
+                label.set_ha('right')
+
         plt.tight_layout()
-        grid.fig.suptitle(f"Metrics for {metric_group} by {tested_variable}")
+        title_suffix = f" grouped by {group_by}" if group_by else ""
+        grid.fig.suptitle(f"Metrics for {metric_group} by {tested_variable}{title_suffix}")
         plt.show()
 
     def plot_run_time(self, tested_variable: str):
@@ -109,6 +126,7 @@ class BatchSimEvaluator:
         df = self.reports.drop_duplicates(subset=[tested_variable, 'run_time'])
         plt.figure(figsize=(7, 5))
         sns.lineplot(data=df, x=tested_variable, y='run_time', color='red', linestyle=':', marker='o', markerfacecolor='black')
+        plt.xticks(rotation=45, ha='right')
         plt.xlabel(tested_variable)
         plt.ylabel('Simulation Run Time (seconds)')
         plt.title(f'Simulation Run Time vs {tested_variable}')

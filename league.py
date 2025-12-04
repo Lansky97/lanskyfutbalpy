@@ -93,10 +93,7 @@ class League:
             league_name = matches[0]['Competition_Name']
             country = matches[0].get('Country', 'England')
 
-        if last_season_factor == 0.0 or last_season_factor is None:
-            last_season_stats = None
-        else:    
-            last_season_stats = read_last_season_stats(season_end_year=season_end_year, country=country, tier=tier, xg_factor=xG_factor)
+        last_season_stats = read_last_season_stats(season_end_year=season_end_year, country=country, tier=tier, xg_factor=xG_factor)
         
         lge = cls(league_name, matches, date_cutoff, xG_factor, last_season_factor)
         lge.teams = Team.teams_from_results(
