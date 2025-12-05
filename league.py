@@ -160,7 +160,7 @@ class League:
                     raise ValueError(f"Missing key '{key}' in result row: {row}")
             home_goals = int(row['HomeGoals']); away_goals = int(row['AwayGoals'])
             home_xg = float(row['Home_xG']); away_xg = float(row['Away_xG'])
-            home_pts, away_pts = get_points(int(row['HomeGoals']), int(row['AwayGoals']))
+            home_pts, away_pts = get_points(home_goals, away_goals)
             results.append({
                 'Date': row['Date'],
                 'Home': row['Home'],
