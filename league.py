@@ -1,4 +1,3 @@
-from line_profiler import profile
 from team import Team
 from utils import read_schedule
 from utils import get_points
