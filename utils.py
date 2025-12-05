@@ -170,9 +170,11 @@ SELECT
 FROM calcs;
 """
     con = ddb.connect(database='data/football_data.db', read_only=True)
-    df = con.execute(query, [season_end_year, tier, country, xg_factor]).fetch_df()
+    output = con.execute(query, [season_end_year, tier, country, xg_factor])
+    rows = output.fetchall()
+    cols = [colname[0] for colname in output.description]
     con.close()
-    return df
+    return [dict(zip(cols, row)) for row in rows]
 
 def get_points(home_goals, away_goals):
     if home_goals > away_goals:
