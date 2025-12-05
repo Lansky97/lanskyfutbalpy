@@ -1,4 +1,3 @@
-from line_profiler import profile
 from typing import Dict, List, Type, Tuple, Any
 
 class Team:
