@@ -48,9 +48,12 @@ class Match:
             limit = max_goals if max_goals is not None else 6
             for fixture in fixtures:
                 matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, max_goals=limit))
-        else:
+        elif cls.__name__ == 'SimmedMatch':
             for fixture in fixtures:
                 matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, rng=rng))
+        else:
+            for fixture in fixtures:
+                matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor))
         
         return matches
 

@@ -60,15 +60,22 @@ class Team:
                     teams[name] = cls(name)
 
         if results:
-            for row in results:
-                home = row['Home']
-                away = row['Away']
-                home_goals = int(row['HomeGoals'])
-                away_goals = int(row['AwayGoals'])
-                home_xg = float(row['Home_xG'])
-                away_xg = float(row['Away_xG'])
-                home_pts = int(row['Home_pts'])
-                away_pts = int(row['Away_pts'])
+            for i, row in enumerate(results):
+                required_keys = ['Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts']
+                missing = [k for k in required_keys if k not in row]
+                if missing:
+                    raise ValueError(f"Result row {i} is missing required keys: {missing}. Row: {row}")
+                try:
+                    home = row['Home']
+                    away = row['Away']
+                    home_goals = int(row['HomeGoals'])
+                    away_goals = int(row['AwayGoals'])
+                    home_xg = float(row['Home_xG'])
+                    away_xg = float(row['Away_xG'])
+                    home_pts = int(row['Home_pts'])
+                    away_pts = int(row['Away_pts'])
+                except (TypeError, ValueError) as e:
+                    raise ValueError(f"Invalid data in result row {i}: {e}. Row: {row}") from e
 
                 if home not in teams:
                     teams[home] = cls(home)

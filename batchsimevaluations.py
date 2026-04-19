@@ -56,7 +56,12 @@ class BatchSimEvaluator:
         reports = []
         sim_count = 0
         for _, row in self.inputs_df.iterrows():
-            is_db = {'season_end_year', 'league', 'tier'}.issubset(row.index)
+            is_db = (
+                {'season_end_year', 'league', 'tier'}.issubset(row.index)
+                and pd.notna(row['season_end_year'])
+                and pd.notna(row['league'])
+                and pd.notna(row['tier'])
+            )
             xG_factor = float(row['xG_factor'])
             date_cutoff = str(row['date_cutoff'])
             n_trials = int(row['n_trials'])
