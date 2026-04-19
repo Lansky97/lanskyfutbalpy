@@ -110,6 +110,8 @@ class Team:
         ) -> None:
         xG_inverse = 1 - xG_factor
         use_lsf = last_season_factor is not None
+        if use_lsf and not 0.0 <= last_season_factor <= 1.0:
+            raise ValueError("last_season_factor must be between 0.0 and 1.0 inclusive")
         inverse_lsf = (1.0 - last_season_factor) if use_lsf else 0.0
 
         ls_map = None
