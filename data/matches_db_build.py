@@ -121,11 +121,15 @@ def infer_status(matches: pd.DataFrame) -> pd.DataFrame:
     matches["status"] = np.select(conditions, choices, "scheduled")
     return matches
 
-def _coerce_time(col: pd.Series) -> pd.Series:
+def _coerce_date(col: pd.Series) -> pd.Series:
     if col is None:
-        return pd.Series([pd.NaT] * 0) 
-    t = pd.to_datetime(col, errors="coerce").dt.time
-    return t
+        return pd.Series([pd.NaT] * 0)
+    return pd.to_datetime(col, errors="coerce").dt.floor('D')
+
+def _coerce_timestamp(col: pd.Series) -> pd.Series:
+    if col is None:
+        return pd.Series([pd.NaT] * 0)
+    return pd.to_datetime(col, errors="coerce", utc=True)
 
 def _nullable_float(col: pd.Series) -> pd.Series:
     return pd.to_numeric(col, errors="coerce").astype("Float64")
@@ -139,8 +143,10 @@ def _safe_col(df: pd.DataFrame, name: str, default, dtype=None):
         return _nullable_float(s)
     if dtype == "int":
         return _nullable_int(s)
+    if dtype == "timestamp":
+        return _coerce_timestamp(s)
     if dtype == "date":
-        return _coerce_time(s)
+        return _coerce_date(s)
     if dtype == "str":
         return s.astype("str")
     return s
@@ -159,15 +165,19 @@ def align_to_schema(matches: pd.DataFrame, schema_columns: list[str] = SCHEMA_CO
         "away_xg"
         ]
     date_columns = [
-        "date",
+        "date"
+        ]
+    timestamp_columns = [
         "last_scraped_at"
         ]
 
-    for col in int_columns:
+    for col in schema_columns:
         if col in int_columns:
             matches_df[col] = _safe_col(matches_df, col, default=pd.NA, dtype="int")
         elif col in float_columns:
             matches_df[col] = _safe_col(matches_df, col, default=pd.NA, dtype="float")
+        elif col in timestamp_columns:
+            matches_df[col] = _safe_col(matches_df, col, default=pd.NaT, dtype="timestamp")
         elif col in date_columns:
             matches_df[col] = _safe_col(matches_df, col, default=pd.NaT, dtype="date")
         else:

@@ -19,7 +19,8 @@ class BatchSimEvaluator:
         params = {
             "mode": "csv",
             "match_data_location": match_data_location,
-            "date_cutoff": "2100-01-01"
+            "date_cutoff": "2100-01-01",
+            "xG_factor": xG_factor
         }
         key = self._cache_key(params)
         if key not in self.league_table_cache:
@@ -33,7 +34,10 @@ class BatchSimEvaluator:
             "mode": "db",
             "season_end_year": season_end_year,
             "league": league,
-            "date_cutoff": "2100-01-01" 
+            "tier": tier,
+            "date_cutoff": "2100-01-01",
+            "xG_factor": xG_factor,
+            "last_season_factor": last_season_factor
         }
         key = self._cache_key(params)
         if key not in self.league_table_cache:

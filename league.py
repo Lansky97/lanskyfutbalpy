@@ -146,10 +146,10 @@ class League:
     
     def update_fixtures(self, update_date: str) -> None:
         try:
-            update_dt = datetime.strptime(update_date, "%Y-%m-%d")
+            datetime.strptime(update_date, "%Y-%m-%d")
         except Exception as e:
             raise ValueError(f"update_date must be a string in YYYY-MM-DD format: {update_date}") from e
-        self.fixtures = [f for f in self.fixtures if f['Date'] > update_dt]
+        self.fixtures = [f for f in self.fixtures if f['Date'] > update_date]
     
     def generate_results(self) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
@@ -160,8 +160,14 @@ class League:
             for key in required_keys:
                 if key not in row:
                     raise ValueError(f"Missing key '{key}' in result row: {row}")
-            home_goals = int(row['HomeGoals']); away_goals = int(row['AwayGoals'])
-            home_xg = float(row['Home_xG']); away_xg = float(row['Away_xG'])
+            try:
+                home_goals = int(row['HomeGoals'])
+                away_goals = int(row['AwayGoals'])
+                home_xg = float(row['Home_xG'])
+                away_xg = float(row['Away_xG'])
+            except (TypeError, ValueError):
+                # Skip rows where goal/xG data is absent (e.g. postponed/scheduled matches)
+                continue
             home_pts, away_pts = get_points(home_goals, away_goals)
             results.append({
                 'Date': row['Date'],

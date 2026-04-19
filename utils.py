@@ -38,7 +38,8 @@ def read_schedule_from_database(season_end_year = 2025, league = 'Premier_League
     venue AS Venue,
     referee AS Referee,
     notes AS Notes,
-    match_report AS MatchURL
+    match_report AS MatchURL,
+    status AS Status
     FROM matches
     WHERE season_end_year = ? AND league = ?;
     """

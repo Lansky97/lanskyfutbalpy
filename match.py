@@ -2,7 +2,7 @@ import numpy as np
 from utils import get_points
 from scipy.stats import poisson
 from team import Team
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Tuple
 
 class Match:
     def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], league_avg_home: float, league_avg_away: float, xG_factor: float) -> None:
@@ -15,7 +15,7 @@ class Match:
         self.home_team: Team = teams[fixture['Home']]
         self.away_team: Team = teams[fixture['Away']]
         self.xG_factor: float = xG_factor
-        self.match_expectation: Union[float, float] = self.get_match_expectation(league_avg_home, league_avg_away)
+        self.match_expectation: Tuple[float, float] = self.get_match_expectation(league_avg_home, league_avg_away)
 
     def __repr__(self) -> str:
         return f"Match({self.home_team.name} vs {self.away_team.name} on {self.date})"
@@ -23,7 +23,7 @@ class Match:
     def __str__(self) -> str:
         return f"{self.home_team.name} vs {self.away_team.name} on {self.date}"
 
-    def get_match_expectation(self, league_avg_home: float, league_avg_away: float) -> Union[float, float]:
+    def get_match_expectation(self, league_avg_home: float, league_avg_away: float) -> Tuple[float, float]:
         home_expected_goals = league_avg_home * self.home_team.home_attack_strength * self.away_team.away_defence_strength
         away_expected_goals = league_avg_away * self.away_team.away_attack_strength * self.home_team.home_defence_strength
         return home_expected_goals, away_expected_goals
