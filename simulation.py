@@ -53,9 +53,9 @@ class Simulation:
                 last_season_factor=self.league.last_season_factor
             )
 
-            trial.teams = self.league.teams
-            trial.results = self.league.results
-            trial.league_table = self.league.generate_league_table()
+            trial.teams = copy.deepcopy(self.league.teams)
+            trial.results = copy.deepcopy(self.league.results)
+            trial.league_table = copy.deepcopy(self.league.generate_league_table())
             simmed_leagues.append(trial)
             self._league_restore(baseline_league)
         return simmed_leagues
