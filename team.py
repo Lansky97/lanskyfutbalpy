@@ -60,8 +60,8 @@ class Team:
                     teams[name] = cls(name)
 
         if results:
+            required_keys = ['Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts']
             for i, row in enumerate(results):
-                required_keys = ['Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG', 'Home_pts', 'Away_pts']
                 missing = [k for k in required_keys if k not in row]
                 if missing:
                     raise ValueError(f"Result row {i} is missing required keys: {missing}. Row: {row}")
