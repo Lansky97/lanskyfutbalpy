@@ -1,5 +1,4 @@
-import copy
-from match import Match, SimmedMatch
+from match import SimmedMatch
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional
