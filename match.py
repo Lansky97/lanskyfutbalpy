@@ -1,20 +1,21 @@
 import numpy as np
-import pandas as pd
 from utils import get_points
 from scipy.stats import poisson
 from team import Team
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Tuple
 
 class Match:
-    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], xG_factor: float) -> None:
+    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], league_avg_home: float, league_avg_away: float, xG_factor: float) -> None:
         for key in ['Date', 'Home', 'Away']:
             if key not in fixture:
                 raise ValueError(f"Missing key '{key}' in fixture: {fixture}")
+        if fixture['Home'] not in teams or fixture['Away'] not in teams:
+            raise ValueError(f"Fixture references unknown teams: {fixture['Home']} or {fixture['Away']}")
         self.date: str = fixture['Date']
         self.home_team: Team = teams[fixture['Home']]
         self.away_team: Team = teams[fixture['Away']]
         self.xG_factor: float = xG_factor
-        self.match_expectation: Union[float, float] = self.get_match_expectation(teams, self.xG_factor)
+        self.match_expectation: Tuple[float, float] = self.get_match_expectation(league_avg_home, league_avg_away)
 
     def __repr__(self) -> str:
         return f"Match({self.home_team.name} vs {self.away_team.name} on {self.date})"
@@ -22,8 +23,7 @@ class Match:
     def __str__(self) -> str:
         return f"{self.home_team.name} vs {self.away_team.name} on {self.date}"
 
-    def get_match_expectation(self, teams: Dict[str, Team], xG_factor: float = 0.6) -> Union[float, float]:
-        league_avg_home, league_avg_away = Team.get_league_averages(teams, xG_factor)
+    def get_match_expectation(self, league_avg_home: float, league_avg_away: float) -> Tuple[float, float]:
         home_expected_goals = league_avg_home * self.home_team.home_attack_strength * self.away_team.away_defence_strength
         away_expected_goals = league_avg_away * self.away_team.away_attack_strength * self.home_team.home_defence_strength
         return home_expected_goals, away_expected_goals
@@ -32,29 +32,34 @@ class Match:
     def from_fixtures(
         cls,
         teams: Dict[str, Team],
-        fixtures: pd.DataFrame,
+        fixtures: List[Dict[str, Any]],
+        league_avg_home: float,
+        league_avg_away: float,
         xG_factor: float,
         max_goals: Optional[int] = None,
         rng: Optional[np.random.Generator] = None
     ) -> List['Match']:
+        if not isinstance(fixtures, list) or not all(isinstance(f, dict) for f in fixtures):
+            raise TypeError("fixtures must be a list of dicts")
+        
         matches: List[Match] = []
         
-        if isinstance(fixtures, pd.DataFrame):
-            for _, fixture in fixtures.iterrows():
-                if max_goals is not None and 'max_goals' in cls.__init__.__code__.co_varnames:
-                    match = cls(teams, fixture, xG_factor, max_goals)
-                elif rng is not None and 'rng' in cls.__init__.__code__.co_varnames:
-                    match = cls(teams, fixture, xG_factor, rng=rng)
-                else:
-                    match = cls(teams, fixture, xG_factor)
-                matches.append(match)
+        if cls.__name__ == 'MarketsMatch':
+            limit = max_goals if max_goals is not None else 6
+            for fixture in fixtures:
+                matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, max_goals=limit))
+        elif cls.__name__ == 'SimmedMatch':
+            for fixture in fixtures:
+                matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, rng=rng))
         else:
-            raise TypeError("fixtures must be a DataFrame")
+            for fixture in fixtures:
+                matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor))
+        
         return matches
 
 class MarketsMatch(Match):
-    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], xG_factor: float, max_goals: int = 6) -> None:
-        super().__init__(teams, fixture, xG_factor)
+    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], league_avg_home: float, league_avg_away: float, xG_factor: float, max_goals: int = 6) -> None:
+        super().__init__(teams, fixture, league_avg_home, league_avg_away, xG_factor)
         self.max_goals: int = max_goals
         self.score_matrix: np.ndarray = self.get_score_matrix()
         self.markets: Dict[str, float] = self.get_match_markets()
@@ -88,8 +93,8 @@ class MarketsMatch(Match):
         }
 
 class SimmedMatch(Match):
-    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], xG_factor: float, rng: np.random.Generator) -> None:
-        super().__init__(teams, fixture, xG_factor)
+    def __init__(self, teams: Dict[str, Team], fixture: Dict[str, Any], league_avg_home: float, league_avg_away: float, xG_factor: float, rng: np.random.Generator) -> None:
+        super().__init__(teams, fixture, league_avg_home, league_avg_away, xG_factor)
         self.sim_result: Dict[str, Any] = self.get_sim_result(rng)
 
     def get_sim_result(self, rng: np.random.Generator) -> Dict[str, Any]:
