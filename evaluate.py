@@ -5,7 +5,7 @@ import numpy as np
 class Evaluate:
     def __init__(self,
         simulation: Simulation,
-        actual_final_table: pd.DataFrame = None
+        actual_final_table: pd.DataFrame
     ):
         self.simulation = simulation
         self.actual_final_table = actual_final_table 
@@ -41,7 +41,15 @@ class Evaluate:
         "POINTS": ["points_mae", "points_rmse", "points_mape", "points_r2"]
        }
 
-       return output.sort_values(["Metric Group", "Metric"]).reset_index(drop=True)
+       cat_order = []
+       for grp, metrics in order.items():
+           for m in metrics:
+               cat_order.append((grp, m))
+       order_index = {(grp, m): i for i, (grp, m) in enumerate(cat_order)}
+       output["_sort"] = output.apply(
+           lambda r: order_index.get((r["Metric Group"], r["Metric"]), 9999), axis=1
+       )
+       return output.sort_values("_sort").drop(columns="_sort").reset_index(drop=True)
     
     def proper_score_metrics(self) -> dict:
        return {
@@ -130,7 +138,10 @@ class Evaluate:
         actuals = self.aligned_positions_and_points['points_actual']
         preds = self.aligned_positions_and_points['points_prediction']
 
-        return float(np.mean(np.abs((actuals - preds) / actuals)))
+        mask = actuals > 0
+        if not np.any(mask):
+            return float('nan')
+        return float(np.mean(np.abs((actuals[mask] - preds[mask]) / actuals[mask])))
 
     def get_points_r2(self) -> float:
         actuals = self.aligned_positions_and_points['points_actual']
@@ -138,6 +149,8 @@ class Evaluate:
         actual_mean = np.mean(actuals)
         ss_res = np.sum((actuals - preds) ** 2)
         ss_tot = np.sum((actuals - actual_mean) ** 2)
+        if ss_tot == 0:
+            return float('nan')
         return float(1 - (ss_res / ss_tot))
 
     def _prep_probs(self) -> dict:

@@ -44,11 +44,11 @@ class Match:
         
         matches: List[Match] = []
         
-        if cls.__name__ == 'MarketsMatch':
+        if issubclass(cls, MarketsMatch):
             limit = max_goals if max_goals is not None else 6
             for fixture in fixtures:
                 matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, max_goals=limit))
-        elif cls.__name__ == 'SimmedMatch':
+        elif issubclass(cls, SimmedMatch):
             for fixture in fixtures:
                 matches.append(cls(teams, fixture, league_avg_home, league_avg_away, xG_factor, rng=rng))
         else:
@@ -67,13 +67,9 @@ class MarketsMatch(Match):
     def get_score_matrix(self) -> np.ndarray:
         home_distribution = poisson.pmf(np.arange(self.max_goals + 1), self.match_expectation[0])
         away_distribution = poisson.pmf(np.arange(self.max_goals + 1), self.match_expectation[1])
-        score_matrix = np.outer(home_distribution, away_distribution)
-
-        score_matrix[-1,:-1] += (1-home_distribution.sum()) * away_distribution[:-1]
-        score_matrix[:-1,-1] += home_distribution[:-1] * (1-away_distribution.sum())
-        score_matrix[-1,-1] += (1-home_distribution.sum()) * (1-away_distribution.sum())
-
-        return score_matrix
+        home_probs = np.append(home_distribution[:-1], 1.0 - home_distribution[:-1].sum())
+        away_probs = np.append(away_distribution[:-1], 1.0 - away_distribution[:-1].sum())
+        return np.outer(home_probs, away_probs)
 
     def get_match_markets(self) -> Dict[str, float]:
         home_win = np.tril(self.score_matrix,-1).sum()
@@ -99,8 +95,8 @@ class SimmedMatch(Match):
 
     def get_sim_result(self, rng: np.random.Generator) -> Dict[str, Any]:
         home_exp, away_exp = self.match_expectation
-        home_goals = rng.poisson(home_exp)
-        away_goals = rng.poisson(away_exp)
+        home_goals = int(rng.poisson(home_exp))
+        away_goals = int(rng.poisson(away_exp))
         home_points, away_points = get_points(home_goals, away_goals)
         trial_result = {
             "Date": self.date,

@@ -1,3 +1,4 @@
+import copy
 from match import SimmedMatch
 import pandas as pd
 import numpy as np
@@ -21,9 +22,9 @@ class Simulation:
         start_time = time.time()
         self.simmed_leagues: List[League] = self.simulate_season()
         self.run_time: float = time.time() - start_time
-        self.mean_final_table: pd.DataFrame = self.mean_final_table()
-        self.position_odds: pd.DataFrame = self.position_odds()
-        self.competition_markets: pd.DataFrame = self.competition_markets()
+        self.mean_final_table: pd.DataFrame = self._compute_mean_final_table()
+        self.position_odds: pd.DataFrame = self._compute_position_odds()
+        self.competition_markets: pd.DataFrame = self._compute_competition_markets()
 
     def simulate_season(self) -> List[League]:
         simmed_leagues: List[League] = []
@@ -97,6 +98,8 @@ class Simulation:
             'home_xg','away_xg','home_xga','away_xga',
             'home_attack_strength_cs','away_attack_strength_cs',
             'home_defence_strength_cs','away_defence_strength_cs',
+            'home_attack_strength_ls','away_attack_strength_ls',
+            'home_defence_strength_ls','away_defence_strength_ls',
             'home_attack_strength','away_attack_strength',
             'home_defence_strength','away_defence_strength'
         )
@@ -106,7 +109,7 @@ class Simulation:
         for name, state in snapshot.items():
             teams[name].__dict__.update(state)
 
-    def mean_final_table(self):
+    def _compute_mean_final_table(self):
 
         tables = [pd.DataFrame(sim.league_table) for sim in self.simmed_leagues]
         all_tables = pd.concat(tables, ignore_index=True)
@@ -115,7 +118,7 @@ class Simulation:
         mean_table['Pos'] = range(1, len(mean_table) + 1) 
         return mean_table
 
-    def position_odds(self):
+    def _compute_position_odds(self):
         tables = [pd.DataFrame(sim.league_table) for sim in self.simmed_leagues]
         all_tables = pd.concat(tables)
         all_tables['Pos'] = all_tables['Pos'].astype(int) 
@@ -128,15 +131,18 @@ class Simulation:
         probs = probs.drop(columns='Avg_Pos')
         return probs
 
-    def competition_markets(self):
+    def _compute_competition_markets(self):
         probs = self.position_odds
 
         num_teams = probs.shape[1]
 
         markets = pd.DataFrame(index=probs.index)
         markets['Champion'] = probs[1]
-        markets['Top 4'] = probs[[1,2,3,4]].sum(axis=1)
-        markets['Top 7'] = probs[[1,2,3,4,5,6,7]].sum(axis=1)
-        markets['Relegation'] = probs[[num_teams-2, num_teams-1, num_teams]].sum(axis=1)
+        top4 = [c for c in [1,2,3,4] if c in probs.columns]
+        markets['Top 4'] = probs[top4].sum(axis=1)
+        top7 = [c for c in [1,2,3,4,5,6,7] if c in probs.columns]
+        markets['Top 7'] = probs[top7].sum(axis=1)
+        relegation_cols = [c for c in [num_teams-2, num_teams-1, num_teams] if c in probs.columns]
+        markets['Relegation'] = probs[relegation_cols].sum(axis=1)
 
         return markets

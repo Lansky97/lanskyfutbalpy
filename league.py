@@ -17,7 +17,7 @@ class League:
         except Exception as e:
             raise ValueError(f"date_cutoff must be a string in YYYY-MM-DD format: {date_cutoff}") from e
         self.date_cutoff_str = date_cutoff
-        if not isinstance(xG_factor, float):
+        if not isinstance(xG_factor, (int, float)):
             raise TypeError("xG_factor must be a float.")
         self.name: str = name
         self.xG_factor: float = xG_factor
@@ -62,6 +62,8 @@ class League:
         date_cutoff: str = '2024-12-01',
         xG_factor: float = 0.6
     ) -> 'League':
+        # last_season_factor is intentionally absent: CSV schedules do not carry
+        # prior-season strength data. Use from_database for last-season blending.
         matches = read_schedule(filepath = match_data)
         if not matches or 'Competition_Name' not in matches[0]:
             league_name = "Unknown League"
@@ -116,8 +118,11 @@ class League:
         xG_inverse = 1 - self.xG_factor
         smooth_home_goals = xG_inverse*self.total_home_goals + self.xG_factor*self.total_home_xg
         smooth_away_goals = xG_inverse*self.total_away_goals + self.xG_factor*self.total_away_xg
-        self.league_avg_home = smooth_home_goals / self.games_played
-        self.league_avg_away = smooth_away_goals / self.games_played
+        if self.games_played == 0:
+            self.league_avg_home, self.league_avg_away = 1.0, 1.0
+        else:
+            self.league_avg_home = smooth_home_goals / self.games_played
+            self.league_avg_away = smooth_away_goals / self.games_played
         self.results.extend(new_results)
         
         Team.update_teams(
@@ -129,6 +134,9 @@ class League:
         fixtures: List[Dict[str, Any]] = []
         seen_fixtures = set()
         for row in self.matches:
+            for key in ('Date', 'Home', 'Away'):
+                if key not in row:
+                    raise ValueError(f"Missing key '{key}' in fixture row: {row}")
             if row['Date'] <= self.date_cutoff_str:
                 continue
 
@@ -153,13 +161,13 @@ class League:
     
     def generate_results(self) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
+        required_keys = ['Date', 'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG']
         for row in self.matches:
-            if row['Date'] > self.date_cutoff_str:
-                continue
-            required_keys = ['Date', 'Home', 'Away', 'HomeGoals', 'AwayGoals', 'Home_xG', 'Away_xG']
             for key in required_keys:
                 if key not in row:
                     raise ValueError(f"Missing key '{key}' in result row: {row}")
+            if row['Date'] > self.date_cutoff_str:
+                continue
             try:
                 home_goals = int(row['HomeGoals'])
                 away_goals = int(row['AwayGoals'])

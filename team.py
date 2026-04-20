@@ -134,7 +134,7 @@ class Team:
                 team.away_attack_strength_ls = float(row.get('away_attack_strength', 0.0))
                 team.away_defence_strength_ls = float(row.get('away_defence_strength', 0.0))
 
-            if team.home_games_played > 0 and league_avg_home > 0:
+            if team.home_games_played > 0 and league_avg_home > 0 and league_avg_away > 0:
                 smoothed_home_goals = xG_inverse*team.home_goals + xG_factor*team.home_xg
                 smoothed_home_goals_against = xG_inverse*team.home_goals_against + xG_factor*team.home_xga
                 team.home_attack_strength_cs = smoothed_home_goals / (team.home_games_played * league_avg_home)
@@ -147,7 +147,7 @@ class Team:
                     team.home_attack_strength_cs = 1.0
                     team.home_defence_strength_cs = 1.0
 
-            if team.away_games_played > 0 and league_avg_away > 0:
+            if team.away_games_played > 0 and league_avg_away > 0 and league_avg_home > 0:
                 smoothed_away_goals = xG_inverse*team.away_goals + xG_factor*team.away_xg
                 smoothed_away_goals_against = xG_inverse*team.away_goals_against + xG_factor*team.away_xga
                 team.away_attack_strength_cs = smoothed_away_goals / (team.away_games_played * league_avg_away) 
